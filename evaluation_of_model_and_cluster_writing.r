@@ -4,6 +4,11 @@ library(tidyverse)
 library(stringr)
 
 
+#this function output, for each fold, the selected clusters for each modality as nifti images
+#it takes as argument the output of the function fit_and_eval_all_combo.r, the name (as char) of
+#nii or nii.gz image defining the space of the images to output 
+#(i.e. the same space to which the inout images are normalized to)
+#and a prefix (as charachter) for naming the cluster
 output_selected_clusters <- function(output_list, space_defining_image, output_name) {
   
   img <- readNIfTI(space_defining_image)
@@ -64,7 +69,7 @@ output_selected_clusters <- function(output_list, space_defining_image, output_n
   
 }
 
-
+#helper function to calculate several performance indexes
 evaluators_calculation <- function(df) {
   
   performance_table <- table(df$classification, df$ground)
@@ -80,6 +85,8 @@ evaluators_calculation <- function(df) {
   
 }
 
+#this function take as input the output of the function fit_and_eval_all_combo.r and output
+#several performance indexes for the stacked folds
 evaluate_model_merged <- function(output_classification) {
   
   all_folds <- output_classification %>%
@@ -90,6 +97,10 @@ evaluate_model_merged <- function(output_classification) {
   
   return(output)
 }
+
+#this function take as input the output of the function fit_and_eval_all_combo.r and output
+#several performance indexes for each fold
+
 
 evaluate_model_fold <- function(output_classification) {
   

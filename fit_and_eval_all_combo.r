@@ -1,3 +1,15 @@
+#this function is a wrap around most of the other functions
+#it takes as input the list output of the function extract_and_normalize_matrix.R,
+#the label of the outcome in the form of a vector
+#a vector of folding label (a number from 1 to N folds for each subject)
+#a vector stating which fold to evaluate (useful for pseudoparallelization)
+#a char vector of the same size of outcome with a label for each subject (useful to keep track of which
+###subject are wrongly classified) or a NULL
+#a unique identifier that is used to save a backup copy of the results of each fold
+#the function output a list of length N of fold that contains the coordinate of the selected
+###clusters for each fold, a dataframe with ground truth and classification for each fold, the weights
+###of the SMO model for each fold,  the subjects in the test and train set for each fold
+#the selected modalities for each fold
 fit_and_eval <- function(list_of_modalities, outcome, fold_to_evaluate, fold_range = NULL, subjects_id = NULL, unique_identifier = Sys.time(), ...) {
   
   if (length(fold_range) == 0) {up_to_fold <- 1:max(fold_to_evaluate)} else {up_to_fold <- fold_range}
