@@ -10,12 +10,17 @@
 ###clusters for each fold, a dataframe with ground truth and classification for each fold, the weights
 ###of the SMO model for each fold,  the subjects in the test and train set for each fold
 #the selected modalities for each fold
+#NB at variance with fit_and_eval_all_combo, this function does not test all possible modality
+###combination, but limits itself to the subset selection algorithm
+
+library(foreach)
 fit_and_eval <- function(list_of_modalities, 
                          outcome, 
                          fold_to_evaluate, 
                          fold_range = NULL, 
                          subjects_id = NULL, 
                          unique_identifier = "BU_",
+                         save_relieff = FALSE,
                          ...) {
   
   if (length(fold_range) == 0) {up_to_fold <- 1:max(fold_to_evaluate)} else {up_to_fold <- fold_range}
@@ -25,12 +30,15 @@ fit_and_eval <- function(list_of_modalities,
   out <- foreach(fold_index = up_to_fold, .inorder = FALSE, 
                  .packages = c("tidyverse","dplyr", "CORElearn", "spatstat", "numDeriv", "quantmod", "Biocomb", "RWeka"),
                  .export = c("sd_thresholding_for_categorical_outcome_variables_vec", "select_features_relieff_derivatives_threshold_CORElearn",
-                             "extract_weights_from_SMO", "SMO_classifier", "list_of_modalities", "outcome", "fold_to_evaluate",
-                             "list_of_modalities_combinations", "select_best_combination_of_modalities")) %do% {
+                             "extract_weights_from_SMO", "SMO_classifier", "list_of_modalities", "outcome", "fold_to_evaluate")) %do% {
                                
                                all_mods_train <- list()
                                all_relieff_features <- list()
                                all_coordinates <- list()
+                               
+                               if (save_relieff) {relieff_survivor <- vector("list", length(list_of_modalities))
+                               
+                               names(relieff_survivor) <- names(list_of_modalities)} else {relieff_survivor = NULL}
                                  
                                
                                print(paste("working on TRAINING SET fold",fold_index, sep = " "))
@@ -41,7 +49,7 @@ fit_and_eval <- function(list_of_modalities,
                                 outcome_train <- outcome[fold != fold_index]
                                 img_dim <- list_of_modalities[[mod]]$img_dim
                                 name_of_mod <- names(list_of_modalities)[[mod]]
-                                if (length(subjects_id) == 0) {training_subjects = NULL
+								 if (length(subjects_id) == 0) {training_subjects = NULL
                                   test_subjects = NULL} else {training_subjects = subjects_id[fold != fold_index]
                                   test_subjects = subjects_id[fold == fold_index]}
                                
@@ -56,6 +64,8 @@ fit_and_eval <- function(list_of_modalities,
                                 relieff <- select_features_relieff_derivatives_threshold_CORElearn(var_thr, "outcome", 
                                                                                                      estimator = "ReliefFequalK")
                                 rm(var_thr)
+                                
+                                relieff_survivor[[mod]] <- relieff
                                
                                 #coordinates finding 
                                 print(paste("coordinates finding, modality is", name_of_mod, "modality", mod, "of", length(list_of_modalities), sep = " "))
@@ -117,18 +127,12 @@ fit_and_eval <- function(list_of_modalities,
                                  all_mods_train <- all_mods_train[-which(is.na(all_mods_train))]}
                                
                                 merged_modalities_df <- Reduce(bind_cols, all_mods_train)
-                                
                                
-                                modalities_combination <- list_of_modalities_combinations(all_mods_train)
-                                
-                                best_combo_dataframe <- select_best_combination_of_modalities(modalities_combination,
-                                                                                              merged_modalities_df, outcome_train)
-                                
-                                best_combo_string <- best_combo_dataframe$best_combo
-                                
-                                best_combo_dataframe <- best_combo_dataframe$final_df
+                                merged_modalities_df$outcome <- outcome_train
                                
-                                
+                                merged_modalities_df_selected <- merged_modalities_df %>%
+                                 select(., select.cfs(merged_modalities_df)$Index, outcome)
+                               
                                 rm(merged_modalities_df)
                                
                                #cluster and select test set
@@ -170,11 +174,11 @@ fit_and_eval <- function(list_of_modalities,
                               
                               
                                merged_modalities_df_test <- Reduce(bind_cols, all_mods_test) %>%
-                                 select(., head(colnames(best_combo_dataframe),-1))
+                                 select(., head(colnames(merged_modalities_df_selected),-1))
                                
                                
                                
-                               model_SMO <- SMO_classifier(as.factor(outcome) ~ ., data = best_combo_dataframe)
+                               model_SMO <- SMO_classifier(as.factor(outcome) ~ ., data = merged_modalities_df_selected)
                                
                                SMO_weights <- extract_weights_from_SMO(model_SMO)
                                
@@ -182,18 +186,15 @@ fit_and_eval <- function(list_of_modalities,
                                
                                
                                accuracy <- data_frame(classification = classification, ground = outcome_test)
-                               
-                               fold_subjects <- list(test_subjects = test_subjects, training_subjects = training_subjects)
+							   fold_subjects <- list(test_subjects = test_subjects, training_subjects = training_subjects)
                                out <- list(all_coordinates, 
                                            accuracy = accuracy, 
-                                           weights = SMO_weights, 
+                                           weights = SMO_weights,
                                            fold_subjects = fold_subjects,
-                                           selected_combo = best_combo_string)
-										   
-								backup_file_name <- paste(unique_identifier, "_fold_", fold_index,".RData", sep = "")
-								save(file = backup_file_name, out)
-								out
-										   
+                                           relieff_survivor = relieff_survivor)
+                               backup_file_name <- paste(unique_identifier, "_fold_", fold_index,".RData", sep = "")
+                               save(file = backup_file_name, out)
+                               out
                                
                              }
   
