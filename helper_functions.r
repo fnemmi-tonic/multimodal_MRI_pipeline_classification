@@ -39,6 +39,10 @@ extract_weights_from_SMO <- function(model) {
   df <- data_frame(features_name = vector(length = length(trimmed_output) + 1, "character"), 
                    features_weight = vector(length = length(trimmed_output) + 1, "numeric"))
   
+  if (length(trimmed_output) == 0) {
+  df$features_name <- NA
+  df$features_weight <- NA} else {
+  
   for (line in 1:length(trimmed_output)) {
     
     
@@ -101,7 +105,7 @@ extract_weights_from_SMO <- function(model) {
   
   
   df <- df %>%
-    arrange(desc(abs(features_weight)))
+    arrange(desc(abs(features_weight)))}
   
   return(df)
 }
@@ -191,23 +195,32 @@ normalize_matrix_range <- function(matrix) {
   return(new_mat)
 }
 
+
 #reshape images
-reshape_images_for_pipeline <- function (image_dir, mask, pattern_for_search) {
+reshape_images_for_pipeline <- function (image_dir, mask, pattern_for_search, subjects_index = NULL) {
   
   this_wd <- getwd()
   setwd(image_dir)
   
   list <- dir(pattern = pattern_for_search)
   number_of_subjects <- length(list)
+  
+  if (is.null(subjects_index)) {subjects <- 1:number_of_subjects} else {subjects <- subjects_index}
+  
+  number_of_subjects <- length(subjects)
+  
+  
+  
+  
   print("reading mask")
   mask_struct <- readNIfTI2(mask)
   mask_sparse <- which(mask_struct@.Data > 0)
   dimension <- length(mask_sparse)
-  n_by_v_matrix <- matrix(data = NA, nr = number_of_subjects, nc = Reduce(`*`, dimension))
+  n_by_v_matrix <- matrix(data = NA, nr = length(subjects), nc = Reduce(`*`, dimension))
   
-  for (image_index in 1:number_of_subjects) {
-    print(paste("reading and processing subject", image_index))
-    img_struct <- readNIfTI2(list[image_index])
+  for (image_index in 1:length(subjects)) {
+    print(paste("reading and processing subject", image_index, "file is", list[subjects[image_index]]))
+    img_struct <- readNIfTI2(list[subjects[image_index]])
     n_by_v_matrix[image_index,] <- img_struct@.Data[mask_sparse]
     
   }
@@ -220,6 +233,25 @@ reshape_images_for_pipeline <- function (image_dir, mask, pattern_for_search) {
   #return(n_by_v_matrix)
   
 }
+
+
+extract_and_normalize_matrix <- function(...,subjects_index = NULL) {
+  
+  arguments <- list(...)
+  
+  for (arg in 1:length(arguments)) {
+    
+    info <- reshape_images_for_pipeline(arguments[[arg]][1], arguments[[arg]][2], arguments[[arg]][3], subjects_index)
+    matrix <- info$n_by_v_matrix
+    matrix <- normalize_matrix_range(matrix)
+    img_dim <- info$dim_img
+    out <- list(matrix = matrix, img_dim = img_dim)
+    assign(names(arguments)[arg], out)
+  }
+  
+  return(mget(names(arguments)))
+}
+
 
 #scale dataframe
 scale_data_frame <- function(df, cols, should_center = TRUE, should_scale = TRUE) {
@@ -329,22 +361,6 @@ select_features_relieff_derivatives_threshold_CORElearn <- function(df, outcome,
   
 }
 
-extract_and_normalize_matrix <- function(...) {
-  
-  arguments <- list(...)
-  
-  for (arg in 1:length(arguments)) {
-    
-    info <- reshape_images_for_pipeline(arguments[[arg]][1], arguments[[arg]][2], arguments[[arg]][3])
-    matrix <- info$n_by_v_matrix
-    matrix <- normalize_matrix_range(matrix)
-    img_dim <- info$dim_img
-    out <- list(matrix = matrix, img_dim = img_dim)
-    assign(names(arguments)[arg], out)
-  }
-  
-  return(mget(names(arguments)))
-}
 
 
 create_n_balanced_folds <- function(original_fold, outcome, n_folds, maxIter = 10000) {
