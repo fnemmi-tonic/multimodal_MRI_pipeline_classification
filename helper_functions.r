@@ -197,11 +197,17 @@ normalize_matrix_range <- function(matrix) {
 
 
 #reshape images
-reshape_images_for_pipeline <- function (image_dir, mask, pattern_for_search, subjects_index = NULL) {
+reshape_images_for_pipeline <- function (image_dir, 
+                                         mask = NA, 
+                                         pattern_for_search,
+                                         features_type,
+                                         delim = ";",
+                                         subjects_index = NULL) {
   
   this_wd <- getwd()
   setwd(image_dir)
   
+  if (features_type == "image"){
   list <- dir(pattern = pattern_for_search)
   number_of_subjects <- length(list)
   
@@ -219,7 +225,7 @@ reshape_images_for_pipeline <- function (image_dir, mask, pattern_for_search, su
   n_by_v_matrix <- matrix(data = NA, nr = length(subjects), nc = Reduce(`*`, dimension))
   
   for (image_index in 1:length(subjects)) {
-    print(paste("reading and processing subject", image_index, "file is", list[subjects[image_index]]))
+    print(paste("reading and processing subject", subjects_index[image_index], "file is", list[subjects[image_index]]))
     img_struct <- readNIfTI2(list[subjects[image_index]])
     n_by_v_matrix[image_index,] <- img_struct@.Data[mask_sparse]
     
@@ -228,24 +234,46 @@ reshape_images_for_pipeline <- function (image_dir, mask, pattern_for_search, su
   colnames(n_by_v_matrix) <- paste("X", mask_sparse, sep = "")
   setwd(this_wd)
   n_by_v_matrix <- as_data_frame(n_by_v_matrix)
-  list(n_by_v_matrix = n_by_v_matrix, dim_img = dim(mask_struct@.Data), img_struct = mask_struct)
-  #print("returning")
-  #return(n_by_v_matrix)
+  list(n_by_v_matrix = n_by_v_matrix, 
+       dim_img = dim(mask_struct@.Data), 
+       img_struct = mask_struct,
+        features_type = features_type)}
   
-}
+  else if (features_type == "nps") {
+    list <- dir(pattern = pattern_for_search)
+    n_by_v_matrix <- read_delim(list[1], delim = delim) %>% 
+      as.matrix()
+    if (is.null(subjects_index)) {subjects <- 1:nrow(n_by_v_matrix)} else {subjects <- subjects_index}
+    n_by_v_matrix <- n_by_v_matrix[subjects,]
+    setwd(this_wd)
+    list(n_by_v_matrix = as_data_frame(n_by_v_matrix),
+         dim_img = dim(n_by_v_matrix),
+         img_struct = NULL,
+         features_type = features_type)}
+    
+    
+    
+  }
+  
 
 
-extract_and_normalize_matrix <- function(...,subjects_index = NULL) {
+extract_and_normalize_matrix <- function(...,
+                                         subjects_index = NULL) {
   
   arguments <- list(...)
   
   for (arg in 1:length(arguments)) {
     
-    info <- reshape_images_for_pipeline(arguments[[arg]][1], arguments[[arg]][2], arguments[[arg]][3], subjects_index)
+    info <- reshape_images_for_pipeline(arguments[[arg]][1], 
+                                        arguments[[arg]][2], 
+                                        arguments[[arg]][3],
+                                        arguments[[arg]][4],
+                                        arguments[[arg]][5],
+                                        subjects_index)
     matrix <- info$n_by_v_matrix
-    matrix <- normalize_matrix_range(matrix)
     img_dim <- info$dim_img
-    out <- list(matrix = matrix, img_dim = img_dim)
+    feat_type <- info$features_type
+    out <- list(matrix = matrix, img_dim = img_dim, features_type = feat_type)
     assign(names(arguments)[arg], out)
   }
   
@@ -470,5 +498,38 @@ create_n_balanced_folds <- function(original_fold, outcome, n_folds, maxIter = 1
   return(list(folds = opt_list, fisher = fisher_ps))
   
 }
+
+
+
+threshold_variance_and_relieff <- function(train_features, 
+                                           train_outcome,
+                                           var_threshold = .25,
+                                           outcome_variable = "outcome",
+                                           estimator, 
+                                           features_type,
+                                           thr_nps = "box_upper"){
+  if (estimator == "ReliefFequalK") {train_outcome <- as.factor(train_outcome)}
+  if (features_type == "nps"){
+    var_thresholded <- sd_thresholding_for_categorical_outcome_variables_vec(train_features, var_threshold)
+    var_thresholded$outcome <- train_outcome
+    df <- var_thresholded
+    rf_weights <- attrEval(formula = ncol(df), df, estimator = estimator)
+    switch (thr_nps,
+            upper_whisker <- {relief_thr <- boxplot(rf_weights, plot = FALSE)$stats[5]},
+            box_upper = {relief_thr <- boxplot(rf_weights, plot = FALSE)$stats[4]},
+            median = {relief_thr <- boxplot(rf_weights, plot = FALSE)$stats[3]},
+            box_lower = {relief_thr <- boxplot(rf_weights, plot = FALSE)$stats[2]},
+            lower_whisker = {relief_thr <- boxplot(rf_weights, plot = FALSE)$stats[1]})
+    surviving_features_name <- names(rf_weights[rf_weights >= relief_thr])
+    surviving_features <- train_features %>% select(one_of(surviving_features_name)) %>%
+      mutate(dummy = 1) %>%
+      select(dummy,one_of(colnames(.)))} else if (features_type == "image") {
+      var_thr <- sd_thresholding_for_categorical_outcome_variables_vec(train_features, var_threshold)
+      var_thr$outcome <- train_outcome
+      surviving_features <- select_features_relieff_derivatives_threshold_CORElearn(var_thr, outcome_variable, estimator = estimator)}
+  
+  return(surviving_features)
+}
+
 
 
