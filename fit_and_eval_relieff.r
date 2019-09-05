@@ -24,16 +24,16 @@ fit_and_eval <- function(list_of_modalities,
                          skip_relieff = FALSE,
                          previous_relieff = NULL,
                          ...) {
-  print("I have at least entered this fucking function")
+  
   if (length(fold_range) == 0) {up_to_fold <- 1:max(fold_to_evaluate)} else {up_to_fold <- fold_range}
-  print("line 29 so far so good")
+  
   SMO_classifier <- make_Weka_classifier("weka/classifiers/functions/SMO")
-  print("line 31 so far so good")
+  
   out <- foreach(fold_index = up_to_fold, .inorder = FALSE, 
                  .packages = c("tidyverse","dplyr", "CORElearn", "spatstat", "numDeriv", "quantmod", "Biocomb", "RWeka"),
                  .export = c("sd_thresholding_for_categorical_outcome_variables_vec", "select_features_relieff_derivatives_threshold_CORElearn",
                              "extract_weights_from_SMO", "SMO_classifier", "list_of_modalities", "outcome", "fold_to_evaluate")) %do% {
-                               print("I have entered the foreach loop")
+                               
                                all_mods_train <- list()
                                all_relieff_features <- list()
                                all_coordinates <- list()
@@ -45,21 +45,21 @@ fit_and_eval <- function(list_of_modalities,
                                
                                print(paste("working on TRAINING SET fold",fold_index, sep = " "))
                                for (mod in 1:length(list_of_modalities)) {
-                               print("I have entered the mod loop") 
+                               
                                 
                                 train <- list_of_modalities[[mod]]$matrix[fold_to_evaluate != fold_index,]
                                 outcome_train <- outcome[fold_to_evaluate != fold_index]
                                 img_dim <- list_of_modalities[[mod]]$img_dim
-                                print("Imma bout to read the name_of_mod")
+                                
                                 name_of_mod <- names(list_of_modalities)[[mod]]
-                                print(str_glue("I fucking read the name of mod, that by the way is {name_of_mod}"))
+                                
                                 features_type <- list_of_modalities[[mod]]$features_type
 								                if (length(subjects_id) == 0) {training_subjects = NULL
                                   test_subjects = NULL} else {training_subjects = subjects_id[fold_to_evaluate != fold_index]
                                   test_subjects = subjects_id[fold_to_evaluate == fold_index]}
                                 
                                 if (!skip_relieff){
-                                  print("started the fucking relieff")
+                                  
                                   print(paste("relieff, modality is", name_of_mod, "modality", mod, "of", length(list_of_modalities), sep = " "))
                                   relieff <- threshold_variance_and_relieff (train,
                                                                              outcome_train,
@@ -69,13 +69,13 @@ fit_and_eval <- function(list_of_modalities,
                                                                              features_type = features_type,
                                                                              thr_nps = "box_upper")
                                 relieff_survivor[[mod]] <- relieff
-                                print("ended relieff")
+                                
                                 } else {print("Loading relieff survivors from previous analysis")
                                   relieff <- previous_relieff[[fold_index]]$relieff_survivor[[name_of_mod]]}
                                 
                                 if (features_type == "image"){
                                 #coordinates finding 
-                                  print("entered image modality branch")
+                                  
                                   print(paste("coordinates finding, modality is", name_of_mod, "modality", mod, "of", length(list_of_modalities), sep = " "))
                                   coordinates_from_features_colnames <- relieff[,-1] %>%
                                     colnames(.) %>%
@@ -117,7 +117,7 @@ fit_and_eval <- function(list_of_modalities,
                                  summarise(mean_of_cluster = mean(value)) %>%
                                  spread(cluster_id, mean_of_cluster) %>%
                                  ungroup(.) %>%
-                                 select(-subject) } else if (features_type == "nps"){print("entered nps modality branch")
+                                 select(-subject) } else if (features_type == "nps"){
                                    df_clusters <- relieff %>% 
                                      select(-dummy)
                                    coordinates_from_features_colnames <- NA}
