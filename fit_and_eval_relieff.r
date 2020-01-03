@@ -1,12 +1,26 @@
-#this function is a wrap around most of the other functions
-#it takes as input the list output of the function extract_and_normalize_matrix.R,
-#the label of the outcome in the form of a vector
-#a vector of folding label (a number from 1 to N folds for each subject)
-#a vector stating which fold to evaluate (useful for pseudoparallelization)
-#a char vector of the same size of outcome with a label for each subject (useful to keep track of which
-###subject are wrongly classified) or a NULL
-#a unique identifier that is used to save a backup copy of the results of each fold
-#the function output a list of length N of fold that contains the coordinate of the selected
+#fit_and_eval
+#this is the main function in the package. It is a wrap around the other helper function and implement 
+#the pipeline from the input to the output of the final modem
+#---PARAMETERS---
+#list_of_modalities: list, this is the output of a call to extract_and_normalize_matrix
+#outcome: character or numeric vector (transformed internally to a foator), the subjects labels
+#fold_to_evaluate: nueric vector, the folding structure (e.g. the output of a call to caret::createFolds(y = outcome, k = 10, list = FALSE)) of length equal to th length of outcome
+#fold_range: numeric vector, which folds should be evaluated (e.g. c(1,2,3) will evaluate only fold 1,2 and 3). Default to NULL, in this case all folds are evaluated
+#subjects_id: character or numeric vector with an id for each subject, length equal to the length of outcome
+#unique_identifier: string, a string to prefix to the backup RData files that will be written for each fold evaluated. Default to "BU_"
+#save_relieff: boolean. Should the features surviving the relieff step be saved in the output list ? Default to TRUE
+#skip relieff: boolean. Should the relieff step be skipped ? Non compatible with save_relieff = FALSE.
+#previous relieff: list, the output of a previously run fit_and_eval function with save_relieff set to TRUE
+#...: arguments to be passed to methods such as cluster_voxels
+#---OUTPUT---
+#the function output a list of length equal to the number of folds containing the following subfield:
+all_coordinates, 
+accuracy = accuracy, 
+weights = SMO_weights,
+fold_subjects = fold_subjects,
+relieff_survivor = relieff_survivor
+
+the coordinate of the selected
 ###clusters for each fold, a dataframe with ground truth and classification for each fold, the weights
 ###of the SMO model for each fold,  the subjects in the test and train set for each fold
 #the selected modalities for each fold

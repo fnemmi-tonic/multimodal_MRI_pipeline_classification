@@ -3,12 +3,12 @@ library(neurobase)
 library(tidyverse)
 library(stringr)
 
-
+#output_selected_clusters
 #this function output, for each fold, the selected clusters for each modality as nifti images
-#it takes as argument the output of the function fit_and_eval_all_combo.r, the name (as char) of
-#nii or nii.gz image defining the space of the images to output 
-#(i.e. the same space to which the inout images are normalized to)
-#and a prefix (as charachter) for naming the cluster
+#---PARAMETERS---
+#output_list: the list that is output of a call of the fit_and_eval function
+#space_defining_image : the absolute path to a nii or a nii.gz file defining the space in which to write the clusters
+#output_name: string, prefix of the filenames of the nifti images to be written
 output_selected_clusters <- function(output_list, space_defining_image, output_name) {
   
   img <- readNIfTI(space_defining_image)
@@ -68,8 +68,10 @@ output_selected_clusters <- function(output_list, space_defining_image, output_n
   }
   
 }
-
+#evaluators_calculation
 #helper function to calculate several performance indexes
+#---PARAMETERS---
+#df: data_frame or data.frame with columns "classification" (label from the fitted model) and "ground" (ground truth)
 evaluators_calculation <- function(df) {
   
   performance_table <- table(df$classification, df$ground)
@@ -85,8 +87,11 @@ evaluators_calculation <- function(df) {
   
 }
 
-#this function take as input the output of the function fit_and_eval_all_combo.r and output
+#evaluate_model_merged
+#this function take as input the output of the function fit_and_eval and output
 #several performance indexes for the stacked folds
+#---PARAMETERS---
+#output_classification: list, the output of a call to fit_and_eval
 evaluate_model_merged <- function(output_classification) {
   
   all_folds <- output_classification %>%
@@ -98,10 +103,11 @@ evaluate_model_merged <- function(output_classification) {
   return(output)
 }
 
-#this function take as input the output of the function fit_and_eval_all_combo.r and output
-#several performance indexes for each fold
-
-
+#evaluate_model_merged
+#this function take as input the output of the function fit_and_eval and output
+#several performance indexes averaged by fold
+#---PARAMETERS---
+#output_classification: list, the output of a call to fit_and_eval
 evaluate_model_fold <- function(output_classification) {
   
   each_folds <- output_classification %>%
