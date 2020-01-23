@@ -14,18 +14,14 @@
 #...: arguments to be passed to methods such as cluster_voxels
 #---OUTPUT---
 #the function output a list of length equal to the number of folds containing the following subfield:
-all_coordinates, 
-accuracy = accuracy, 
-weights = SMO_weights,
-fold_subjects = fold_subjects,
-relieff_survivor = relieff_survivor
+#all_coordinates: named list of length equal to the number of entered modalities, contains the coordinates of the voxels
+##within the selected clusters and their cluster index in a spare matrix format
+#accuracy = data_frame with columns prediction and ground containing respectively the predicted label for each subject and the ground truth
+#weights = vector, weigths from the SMO model
+#fold_subjects = list of length equal to the number of fold: for each fold contains two elements, the ids of subject used for training
+##and the id of subjects using for testing
+##relieff_survivor = list of vector with the name of the features (i.e. voxels) that survived the relieff step
 
-the coordinate of the selected
-###clusters for each fold, a dataframe with ground truth and classification for each fold, the weights
-###of the SMO model for each fold,  the subjects in the test and train set for each fold
-#the selected modalities for each fold
-#NB at variance with fit_and_eval_all_combo, this function does not test all possible modality
-###combination, but limits itself to the subset selection algorithm
 
 library(foreach)
 fit_and_eval <- function(list_of_modalities, 

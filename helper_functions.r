@@ -9,7 +9,15 @@ library(numDeriv)
 library(quantmod)
 
 
-#correct for nuisance variables
+#residuals_on_a_vector
+#returns the residuals of a linear model fitted using nuisance variables as independent variable
+##and the variable to be denoised as dependent variable
+#---PARAMETERS---
+#vec: numeric vector, the variable to be denoised
+#iv_as_a_dataframe: nuisance variables as data_frame or data.frame
+#formula: a formula to fit a linear model. if NULL the formula is automatically set as "~.". Default to null
+#---OUTPUT---
+##res : numeric vector with the residuals
 residuals_on_a_vector <- function(vec, iv_as_a_dataframe, formula = NULL) {
   if (is.null(formula)) {formula <- as.formula("dependent ~ .")} else {formula <- as.formula(paste("dependent ~ ",formula))}
   df <- iv_as_a_dataframe
@@ -19,6 +27,14 @@ residuals_on_a_vector <- function(vec, iv_as_a_dataframe, formula = NULL) {
   return(res)
 }
 
+#residuals_on_a_dataframe
+#adaptation of residuals_on_a_vector for whole dataframe
+#---PARAMETERS---
+#df: a data_frame or data.frame with rows = number of subjects and columns = variables to be denoised
+#iv_as_a_dataframe: nuisance variables as data_frame or data.frame
+#formula: a formula to fit a linear model. if NULL the formula is automatically set as "~.". Default to null
+#---OUTPUT---
+##out : denoised data_frame
 residuals_on_a_dataframe <- function(df, iv_as_a_dataframe, formula = NULL) {
   
   out <- map(df,residuals_on_a_vector, iv_as_a_dataframe, formula)
@@ -26,8 +42,12 @@ residuals_on_a_dataframe <- function(df, iv_as_a_dataframe, formula = NULL) {
   
 }
 
-
-#extract weights from different models
+#extract_weights_from_SMO
+#extract weights and variable names from a fitted SMO model (discrimination)
+#---PARAMETERS---
+#model: a fitted SMO model
+#---OUTPUT---
+##df: a data_frame with columns "names" and "weights' containing the variables names and weights
 extract_weights_from_SMO <- function(model) {
   
   oldw <- getOption("warn")
@@ -110,6 +130,12 @@ extract_weights_from_SMO <- function(model) {
   return(df)
 }
 
+#extract_weights_from_SMOreg
+#extract weights and variable names from a fitted SMO model (regression)
+#---PARAMETERS---
+#model: a fitted SMO model
+#---OUTPUT---
+##df: a data_frame with columns "names" and "weights' containing the variables names and weights
 extract_weights_from_SMOreg <- function(model) {
   
   oldw <- getOption("warn")
@@ -188,6 +214,12 @@ extract_weights_from_SMOreg <- function(model) {
   return(df)
 }
 
+#normalize_matrix_range
+#normalize matrix by rescaling from 0 and 1
+#---PARAMETERS---
+#matrix: the matrix to be scaled
+#---OUTPUT---
+##new_mat: the range normalized matrix
 #normalize matrix range
 normalize_matrix_range <- function(matrix) {
   range_mat <- range(matrix)
@@ -196,7 +228,21 @@ normalize_matrix_range <- function(matrix) {
 }
 
 
-#reshape images
+#reshape_images_for_pipeline
+#Reshape two or more 3D images in nifti or nifti gz format to a matrix with number of rows = number of images
+## and number of columns = number of voxels in the images. If the features are 2D (csv file), read the csv file and create the 
+##expected matrix
+#---PARAMETERS---
+#image_dir: the directory where all the images (of the same dimension) are stored
+#mask : string, the name of the image to use as mask (it should be in the same directory as image_dir). 
+##If the features are 2D (features_type = "nps") enter NULL. default to NULL
+#pattern_for_search: string, the pattern to search for listing all the images (e.g. if you have smoothed normalized
+##images from SPM this could be "sw") or the csv file if  
+#features_type: string, the type of features entered (accepted are "nps" and "image")
+#delim: only useful for csv file (2D features)
+#subjects_index: indexes of subject to be included, if NULL all subjects are included. Default to NULL
+#---OUTPUT---
+##new_mat: the range normalized matrix
 reshape_images_for_pipeline <- function (image_dir, 
                                          mask = NA, 
                                          pattern_for_search,
@@ -257,6 +303,13 @@ reshape_images_for_pipeline <- function (image_dir,
   
 
 
+#extract_and_normalize_matrix
+#Wrapper around reshape_images_for_pipeline
+#---PARAMETERS---
+#...: a number of named vectors with names equal to the parameters of reshape_images_for_pipeline
+#subjects_index: indexes of subject to be included, if NULL all subjects are included. Default to NULL
+#---OUTPUT---
+##a list of matrices of length equal to the input vector
 extract_and_normalize_matrix <- function(...,
                                          subjects_index = NULL) {
   
@@ -295,7 +348,12 @@ scale_data_frame <- function(df, cols, should_center = TRUE, should_scale = TRUE
 library(magrittr)
 library(dplyr)
 
-
+#var_vectorized
+#calculate variance of a matrix by columns in a vectorized way
+#---PARAMETERS---
+#mat: the numeric matrix
+#---OUTPUT---
+#a vector with variance for each columns
 var_vectorized <- function(mat) {
   
   mean_r <- colSums(mat)/nrow(mat)
@@ -303,6 +361,13 @@ var_vectorized <- function(mat) {
   var_r <- rowSums(mat_sub_mean)/(ncol(mat_sub_mean)-1)
 }
 
+#sd_thresholding_for_categorical_outcome_variables_vec
+#retains only those features that have variance higher than a certain threshold
+#---PARAMETERS---
+#df: a data_frame of features
+#quant: numeric, the threshold
+#---OUTPUT---
+#a data_frame wich include only the retained variables
 sd_thresholding_for_categorical_outcome_variables_vec <- function(df, quant) {
   
   
@@ -318,25 +383,7 @@ sd_thresholding_for_categorical_outcome_variables_vec <- function(df, quant) {
   return(output_df)
 }
 
-#sd thresholding
-sd_thresholding_vec <- function(df, outcome) {
-  
-  mean_outcome <- mean(outcome)
-  sd_outcome <- sd(outcome)
-  
-  
-  sd_threshold_for_each_feature <- 0.5 * (sd_outcome/mean_outcome) * mean(as.matrix(df))
-  
-  
-  #sd_each_features <- sqrt(var_vectorized(df))
-  
-  features_above_treshold <- which(sd_each_features > sd_threshold_for_each_feature)
-  
-  output_df <- df %>%
-    select(., features_above_treshold)
-  
-  return(output_df)
-}
+
 
 #relieff feat selection
 
