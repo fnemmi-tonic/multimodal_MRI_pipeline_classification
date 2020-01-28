@@ -228,6 +228,19 @@ normalize_matrix_range <- function(matrix) {
 }
 
 
+normalize_vector_range <- function(vec){
+  range_vec <- range(vec)
+  new_vec <- (vec - range_vec[1])/(range_vec[2] - range_vec[1])
+  return(new_vec)
+}
+
+
+normalize_matrix_range_by_columns <- function(mat){
+  new_mat <- apply(mat, 2, normalize_vector_range)
+  return(new_mat)
+}
+
+
 #reshape_images_for_pipeline
 #Reshape two or more 3D images in nifti or nifti gz format to a matrix with number of rows = number of images
 ## and number of columns = number of voxels in the images. If the features are 2D (csv file), read the csv file and create the 
@@ -334,15 +347,6 @@ extract_and_normalize_matrix <- function(...,
 }
 
 
-#scale dataframe
-scale_data_frame <- function(df, cols, should_center = TRUE, should_scale = TRUE) {
-  to_scale <- select(df, cols)
-  scaled <- scale(to_scale, center = should_center, scale = should_scale)
-  new_df <- df
-  new_df[, cols] <- scaled
-  new_df <- as_data_frame(new_df)
-  return(new_df)
-}
 
 #sd thresholding for categorical outcome variable
 library(magrittr)
@@ -386,17 +390,37 @@ sd_thresholding_for_categorical_outcome_variables_vec <- function(df, quant) {
 
 
 #relieff feat selection
-
+#calculate the derivative of a GRAPHICAL function (i.e. a function for which you have x and y)
+#---PARAMETERS---
+#x: numeric vector, coordinates on the x axis
+#y: numeric vector, coordinates on the y axis
+#---OUTPUT---
+#the derivative
 deriv <- function(x,y) {
   output <- diff(y)/diff(x)
   return(output)
 }
 
+#middle pts
+#calculate the middle points of lagged difference of a numerical series
+#---PARAMETERS---
+#x: the numerical series whose middle points should be calculated
+#---OUTPUT---
+#a numerical vector with the middle points
 middle_pts <- function(x){
   pts <- x[-1] - diff(x) / 2
   return(pts)
 }
 
+#calculate_features_threshold_based_on_second_derivative
+#calculate the reliefF treshold based on the scree plot methods (i.e. find the minimum of the second derivatives
+##of the orderd reliefF weights)
+#---PARAMETERS---
+#x: numeric vector, the ordinal position of the weight (i.e. seq(1,length(y)))
+#y: ordered relieff weights
+#to_plot: boolean, should the weigths and the threshold be plotted ? default to TRUE
+#---OUTPUT---
+#a named list containing the smoothed second derivative, the original second derivative and the threshold
 calculate_features_threshold_based_on_second_derivative <- function(x,y, to_plot = TRUE) {
   smoothed_y <- loess(y ~ x,
                       data.frame(y = y, x = x, model = T), span = .1) %>% predict(.)
@@ -414,7 +438,16 @@ calculate_features_threshold_based_on_second_derivative <- function(x,y, to_plot
   return(list(smoothed_second_derivatives = smooth_second_d, second_derivative_values = otp, threshold = thr))
 }
 
-
+#calculate_features_threshold_based_on_second_derivative
+#calculate the reliefF weights for the features in a dateframe and return a dataframe containing only the features
+##with reliefF weight higher than the calculated threshold (see function above)
+#---PARAMETERS---
+#df: data.frame or (preferred) data_frame structures with nrow = number of subjects and ncol = number of features + 1
+##the last column of the dataframe should contain the outcome
+#outcome: string, the name of the last column
+#estimator: one of the accepted estimator of CORElearn::attrEval
+#---OUTPUT---
+#a data_frame containing only the features surviving the reliefF threshold plus the outcome
 select_features_relieff_derivatives_threshold_CORElearn <- function(df, outcome, estimator) {
   
   
@@ -438,34 +471,6 @@ select_features_relieff_derivatives_threshold_CORElearn <- function(df, outcome,
 
 
 
-create_n_balanced_folds <- function(original_fold, outcome, n_folds, maxIter = 10000) {
-  
-  opt_list <- list()
-  fisher_ps <- vector()
-  iteration_counter <- 0
-  index = 0
-  test_folds <- n_folds
-  while (test_folds != 0) {
-    this_fold <- sample(fold)
-    fisher_p <- fisher.test(table(this_fold, outcome))$p.value
-    eq_test <- sum(unlist(map2(list(this_fold), opt_list, identical)))
-    if (fisher_p > .2 && eq_test == 0) {
-      index = index + 1
-      opt_list[[index]] <- this_fold
-      test_folds <- test_folds - 1
-      fisher_ps[index] <- fisher_p
-    }
-    iteration_counter <- iteration_counter + 1
-    
-    if (iteration_counter == maxIter) {
-      warning("maxIter reached")
-      break
-    }
-  }
-  
-  return(list(folds = opt_list, fihser = fisher_ps))
-  
-}
 
 
 cluster_voxels <- function(coordinates_table, minimum_extent = 10, distances = c(1.8,3,4), n_passes = 3){
